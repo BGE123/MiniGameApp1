@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Mini Games App</string>
+    <string name="score_text">Score: 0</string>
+    <string name="time_text">Time: 60</string>
+    <string name="reset_button">Reset</string>
+    <string name="end_button">End</string>
+    <string name="card_match">Card Match</string>
+    <string name="card_match_game">Card Match Game</string>
+    <string name="game_2">Game 2</string>
+
+</resources>

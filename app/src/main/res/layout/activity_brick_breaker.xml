@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_dark_arcade"
+    >
+
+    <!-- The SurfaceView that draws the Brick Breaker game -->
+    <com.example.minigamesapp.BrickBreakerView
+        android:id="@+id/brickBreakerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+</FrameLayout>
