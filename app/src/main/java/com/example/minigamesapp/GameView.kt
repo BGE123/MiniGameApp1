@@ -1,198 +1,222 @@
 package com.example.minigamesapp
 
 import android.content.Context
-import android.graphics.*
-import android.media.AudioAttributes
-import android.media.SoundPool
-import android.os.Build
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.random.Random
 
-class GameView(context: Context) : SurfaceView(context), Runnable {
+class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
 
-    @Volatile private var isPlaying = false
-    private var thread: Thread? = null
-    private val surfaceHolder: SurfaceHolder = holder
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val thread: GameThread
+    private val paint = Paint()
 
-    private var screenX = 0
-    private var screenY = 0
+    // Player variables
+    private var playerX = 0f
+    private var playerY = 0f
+    private var playerSize = dp(50f)
+    private var lane = 1 // 0 = left, 1 = middle, 2 = right
 
-    private lateinit var player: Player
-    private val obstacles = mutableListOf<Obstacle>()
+    // Jump + gravity
+    private var jumping = false
+    private var jumpVelocity = 0f
+    private val gravity = dp(1f)
 
-    private var background: Bitmap
+    // Sliding
+    private var sliding = false
+    private var slideTimer = 0
 
-    private var score = 0
-    private var highScore = 0
+    // Obstacles
+    private val obstacles = mutableListOf<RectF>()
+    private var obstacleSpeed = dp(10f)
 
-    // spawning
-    private var lastSpawnTime = System.currentTimeMillis()
-    private var spawnInterval = Random.nextLong(900, 2200)
+    // Gesture detection
+    private val gestureDetector = GestureDetector(context, GestureListener())
 
-    // soundpool
-    private var soundPool: SoundPool
-    private var jumpSound = 0
-    private var crashSound = 0
-
-    // listener for activity
-    var onGameOver: ((score: Int, highScore: Int) -> Unit)? = null
+    // Constants
+    private val SWIPE_THRESHOLD = 100
 
     init {
-        val dm = resources.displayMetrics
-        screenX = dm.widthPixels
-        screenY = dm.heightPixels
-
-        background = BitmapFactory.decodeResource(resources, R.drawable.background)
-        background = Bitmap.createScaledBitmap(background, screenX, screenY, true)
-
-        player = Player(context, screenX, screenY)
-
-        // preload 1 obstacle
-        obstacles.add(Obstacle(context, screenX, screenY))
-
-        // SoundPool setup (API safe)
-        soundPool = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            SoundPool.Builder()
-                .setMaxStreams(4)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_GAME)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                .build()
-        } else {
-            @Suppress("DEPRECATION")
-            SoundPool(4, android.media.AudioManager.STREAM_MUSIC, 0)
-        }
-        try {
-            jumpSound = soundPool.load(context, R.raw.jump, 1)
-            crashSound = soundPool.load(context, R.raw.crash, 1)
-        } catch (_: Exception) { /* missing resource handled at runtime */ }
-
-        // load high score
-        val prefs = context.getSharedPreferences("runner_prefs", Context.MODE_PRIVATE)
-        highScore = prefs.getInt("high_score", 0)
+        holder.addCallback(this)
+        thread = GameThread(holder, this)
+        isFocusable = true
     }
 
-    override fun run() {
-        while (isPlaying) {
-            val start = System.currentTimeMillis()
-            update()
-            draw()
-            val took = System.currentTimeMillis() - start
-            val sleep = (17 - took).coerceAtLeast(2)
-            try { Thread.sleep(sleep) } catch (_: InterruptedException) {}
-        }
+    override fun surfaceCreated(holder: SurfaceHolder) {
+        thread.setRunning(true)
+        thread.start()
     }
 
-    private fun update() {
-        // spawn logic
-        val now = System.currentTimeMillis()
-        if (now - lastSpawnTime >= spawnInterval) {
-            obstacles.add(Obstacle(context, screenX, screenY))
-            lastSpawnTime = now
-            spawnInterval = Random.nextLong(900, 2600)
-            // limit count
-            if (obstacles.size > 6) obstacles.removeAt(0)
-        }
-
-        player.update()
-
-        val playerRect = player.getCollisionShape()
-
-        val it = obstacles.iterator()
-        while (it.hasNext()) {
-            val ob = it.next()
-            ob.update()
-
-            // collision
-            if (Rect.intersects(ob.getCollisionShape(), playerRect)) {
-                // game over
-                soundPool.play(crashSound, 1f, 1f, 1, 0, 1f)
-                isPlaying = false
-                saveHighScoreIfNeeded()
-                post {
-                    onGameOver?.invoke(score, highScore)
-                }
-                return
-            }
-
-            // off screen -> recycle and increase score
-            if (ob.isOffScreen()) {
-                score++
-                // recycle instead of new allocation for smoother performance
-                ob.reset(screenX)
-            }
-        }
+    override fun surfaceDestroyed(holder: SurfaceHolder) {
+        thread.setRunning(false)
+        thread.join()
     }
 
-    private fun saveHighScoreIfNeeded() {
-        if (score > highScore) {
-            highScore = score
-            val prefs = context.getSharedPreferences("runner_prefs", Context.MODE_PRIVATE)
-            prefs.edit().putInt("high_score", highScore).apply()
-        }
-    }
-
-    private fun draw() {
-        if (!surfaceHolder.surface.isValid) return
-        val canvas = surfaceHolder.lockCanvas()
-        try {
-            canvas.drawBitmap(background, 0f, 0f, paint)
-            // draw player
-            canvas.drawBitmap(player.bitmap, player.x.toFloat(), player.y.toFloat(), paint)
-
-            // draw obstacles
-            for (ob in obstacles) {
-                canvas.drawBitmap(ob.bitmap, ob.x.toFloat(), ob.y.toFloat(), paint)
-            }
-
-            // HUD
-            paint.color = Color.WHITE
-            paint.textSize = 64f
-            paint.typeface = Typeface.DEFAULT_BOLD
-            canvas.drawText("Score: $score", 40f, 100f, paint)
-            paint.textSize = 36f
-            canvas.drawText("High: $highScore", 40f, 150f, paint)
-        } finally {
-            surfaceHolder.unlockCanvasAndPost(canvas)
-        }
-    }
-
-    fun resume() {
-        if (isPlaying) return
-        isPlaying = true
-        thread = Thread(this)
-        thread?.start()
-    }
-
-    fun pause() {
-        isPlaying = false
-        try { thread?.join() } catch (_: InterruptedException) {}
-        thread = null
-    }
-
-    fun restart() {
-        score = 0
-        obstacles.clear()
-        obstacles.add(Obstacle(context, screenX, screenY))
-        player = Player(context, screenX, screenY)
-        lastSpawnTime = System.currentTimeMillis()
-        spawnInterval = Random.nextLong(900, 2200)
-        isPlaying = true
-        thread = Thread(this)
-        thread?.start()
-    }
+    override fun surfaceChanged(
+        holder: SurfaceHolder,
+        format: Int,
+        width: Int,
+        height: Int
+    ) {}
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_DOWN) {
-            player.jump()
-            try { soundPool.play(jumpSound, 1f, 1f, 1, 0, 1f) } catch (_: Exception) {}
-        }
+        gestureDetector.onTouchEvent(event)
         return true
+    }
+
+    fun update() {
+        // Update jump
+        if (jumping) {
+            playerY += jumpVelocity
+            jumpVelocity += gravity
+            if (playerY >= height - playerSize - dp(50f)) {
+                playerY = height - playerSize - dp(50f)
+                jumping = false
+            }
+        }
+
+        // Update slide
+        if (sliding) {
+            slideTimer--
+            if (slideTimer <= 0) {
+                sliding = false
+            }
+        }
+
+        // Update player X by lane
+        playerX = when (lane) {
+            0 -> width / 6f - playerSize / 2
+            1 -> width / 2f - playerSize / 2
+            else -> 5 * width / 6f - playerSize / 2
+        }
+
+        // Spawn obstacles
+        if (Random.nextInt(100) < 2) {
+            val laneX = when (Random.nextInt(3)) {
+                0 -> width / 6f - playerSize / 2
+                1 -> width / 2f - playerSize / 2
+                else -> 5 * width / 6f - playerSize / 2
+            }
+            obstacles.add(RectF(laneX, -playerSize, laneX + playerSize, 0f))
+        }
+
+        // Move obstacles
+        val iterator = obstacles.iterator()
+        while (iterator.hasNext()) {
+            val obstacle = iterator.next()
+            obstacle.top += obstacleSpeed
+            obstacle.bottom += obstacleSpeed
+
+            // Remove if off screen
+            if (obstacle.top > height) {
+                iterator.remove()
+                continue
+            }
+
+            // Collision detection
+            val playerRect = if (sliding) {
+                RectF(playerX, playerY + playerSize / 2, playerX + playerSize, playerY + playerSize)
+            } else {
+                RectF(playerX, playerY, playerX + playerSize, playerY + playerSize)
+            }
+
+            if (RectF.intersects(playerRect, obstacle)) {
+                resetGame()
+            }
+        }
+    }
+
+    override fun draw(canvas: Canvas) {
+        super.draw(canvas)
+        canvas.drawColor(Color.WHITE)
+
+        // Draw player
+        paint.color = Color.BLUE
+        if (sliding) {
+            canvas.drawRect(
+                playerX,
+                playerY + playerSize / 2,
+                playerX + playerSize,
+                playerY + playerSize,
+                paint
+            )
+        } else {
+            canvas.drawRect(
+                playerX,
+                playerY,
+                playerX + playerSize,
+                playerY + playerSize,
+                paint
+            )
+        }
+
+        // Draw obstacles
+        paint.color = Color.RED
+        for (obstacle in obstacles) {
+            canvas.drawRect(obstacle, paint)
+        }
+    }
+
+    private fun resetGame() {
+        obstacles.clear()
+        lane = 1
+        jumping = false
+        sliding = false
+        playerY = height - playerSize - dp(50f)
+    }
+
+    inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
+        private val SWIPE_THRESHOLD = 100
+
+        // onDown must match the non-null signature in many SDKs
+        override fun onDown(e: MotionEvent): Boolean {
+            return true
+        }
+
+        // Use the signature your IDE suggested: e1 nullable, e2 non-null
+        override fun onFling(
+            e1: MotionEvent?,    // nullable here (check your IDE message)
+            e2: MotionEvent,     // non-null here
+            velocityX: Float,
+            velocityY: Float
+        ): Boolean {
+            // if e1 is null we can't compute a meaningful fling — ignore
+            if (e1 == null) return false
+
+            val diffX = e2.x - e1.x
+            val diffY = e2.y - e1.y
+
+            if (kotlin.math.abs(diffX) > kotlin.math.abs(diffY)) {
+                // horizontal swipe -> lane change
+                if (diffX > SWIPE_THRESHOLD) {
+                    lane = min(2, lane + 1) // move right
+                } else if (diffX < -SWIPE_THRESHOLD) {
+                    lane = max(0, lane - 1) // move left
+                }
+            } else {
+                // vertical swipe -> jump / slide
+                if (diffY < -SWIPE_THRESHOLD && !jumping) {
+                    jumping = true
+                    jumpVelocity = -dp(18f)   // or use a literal if dp() not available
+                } else if (diffY > SWIPE_THRESHOLD && !sliding) {
+                    sliding = true
+                    slideTimer = 30
+                }
+            }
+            return true
+        }
+    }
+
+    // helper dp function
+    private fun dp(value: Float): Float {
+        return value * resources.displayMetrics.density
     }
 }

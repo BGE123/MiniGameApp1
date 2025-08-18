@@ -1,28 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Base: white background with rounded bottom corners -->
+    <!-- Full background (literal color so no external resource lookup) -->
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="@drawable/bg_gradient"/>"/>
-            <!-- only bottom corners rounded -->
-            <corners
-                android:topLeftRadius="0dp"
-                android:topRightRadius="0dp"
-                android:bottomLeftRadius="16dp"
-                android:bottomRightRadius="16dp"/>
+            <solid android:color="#FFF3B0" />
+            <corners android:radius="0dp" />
         </shape>
     </item>
 
-    <!-- Bottom border: a thin rectangle positioned at the bottom -->
+    <!-- Bottom border (literal color + explicit height) -->
     <item android:gravity="bottom">
         <shape android:shape="rectangle">
-            <size android:height="6dp"/>            <!-- control border thickness -->
-            <solid android:color="#FFFFFF"/>        <!-- border color -->
-            <!-- match bottom corner radius so ends are rounded -->
-            <corners
-                android:bottomLeftRadius="50dp"
-                android:bottomRightRadius="50dp"/>
+            <size android:height="6dp" />
+            <solid android:color="#2196F3" />
         </shape>
     </item>
 

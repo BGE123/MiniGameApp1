@@ -1,38 +1,85 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/idle_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center"
     android:orientation="vertical"
     android:padding="20dp"
-    android:background="#121212">
+    android:gravity="center_horizontal"
+    android:background="@drawable/bg_gradient_game">
 
     <TextView
+        android:id="@+id/idleClickTitle"
+        android:layout_width="match_parent"
+        android:layout_height="28dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="12dp"
+        android:fontFamily="@font/poppins_semibold"
+        android:gravity="center"
+        android:text="IDLE CLICKER"
+        android:textColor="@android:color/black"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Score display -->
+    <TextView
         android:id="@+id/scoreText"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Score: 0"
-        android:textSize="24sp"
-        android:textColor="#FFFFFF"
-        android:layout_marginBottom="20dp" />
-
-    <Button
-        android:id="@+id/clickButton"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:text="Click!"
+        android:text="Score: 0 (Auto: 0/s)"
         android:textSize="20sp"
-        android:backgroundTint="#4CAF50"
-        android:textColor="#FFFFFF" />
+        android:textStyle="bold"
+        android:gravity="center"
+        android:padding="8dp" />
 
-    <Button
-        android:id="@+id/upgradeButton"
-        android:layout_width="200dp"
+    <!-- Big click button (image) -->
+    <ImageButton
+        android:id="@+id/clickButton"
+        android:layout_width="260dp"
+        android:layout_height="260dp"
+        android:layout_marginTop="24dp"
+        android:scaleType="centerCrop"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/click_asset_1"
+        android:contentDescription="Click me"
+        android:elevation="8dp" />
+
+    <!-- Small info / progress -->
+    <TextView
+        android:id="@+id/assetLabel"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Buy AutoClick (10)"
+        android:text="Starter Fruit"
         android:textSize="16sp"
-        android:layout_marginTop="20dp"
-        android:backgroundTint="#FF9800"
-        android:textColor="#FFFFFF" />
+        android:gravity="center"
+        android:layout_marginTop="12dp" />
+
+    <!-- Upgrade row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="18dp">
+
+        <Button
+            android:id="@+id/upgradeButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Buy Auto (Cost: 10)"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp" />
+
+        <Button
+            android:id="@+id/resetButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Reset"
+            android:layout_marginStart="12dp" />
+    </LinearLayout>
 
 </LinearLayout>
